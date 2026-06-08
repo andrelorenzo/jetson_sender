@@ -16,6 +16,7 @@ add_executable(
     rs_sender
     src/main.cpp
     src/comms_common.cpp
+    src/comms_runtime.cpp
     src/app_config.cpp
     src/app_support.cpp
     src/client_transport.cpp

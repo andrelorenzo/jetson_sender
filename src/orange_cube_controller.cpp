@@ -12,6 +12,7 @@
 
 #include "app_constants.h"
 #include "comms_common.h"
+#include "comms_runtime.h"
 #include "logger.h"
 #include "mavlink_bridge.h"
 
@@ -272,10 +273,7 @@ void RunOrangeCubeControl(AppContext *ctx) {
         return;
     }
 
-    comms_opt_t opt = {};
-    opt.local_port = constants::kControlListenPort;
-    opt.recvcb = HandleControlCommand;
-    comms_udp_init__opt(ctx->control_commh, opt);
+    InitUdpReceiver(ctx->control_commh, constants::kControlListenPort, HandleControlCommand);
 
     Logger(INFO, "Control UDP escuchando TWIST en puerto %u", constants::kControlListenPort);
 

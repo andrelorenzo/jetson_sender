@@ -6,6 +6,7 @@
 
 #include "app_constants.h"
 #include "comms_common.h"
+#include "comms_runtime.h"
 #include "logger.h"
 
 namespace rsapp {
@@ -78,8 +79,7 @@ bool SendPayload(AppContext *ctx, uint16_t msg_id, const void *data, size_t data
         return false;
     }
 
-    comms_send_opt_t opt = {};
-    return comms_send__opt(ctx->data_commh, frame, static_cast<size_t>(frame_len), opt);
+    return SendFrame(ctx->data_commh, frame, static_cast<size_t>(frame_len));
 }
 
 void ClearImuQueues(AppContext *ctx) {
@@ -139,15 +139,12 @@ void RunImuPublisher(AppContext *ctx) {
 
     g_ctx = ctx;
 
-    comms_opt_t opt = {};
-    opt.local_port = constants::kClientListenPort;
-    opt.recvcb = HandleClientCommand;
     if (ctx->data_commh == nullptr) {
         Logger(ERROR, "Handle UDP de datos no inicializado");
         return;
     }
 
-    comms_udp_init__opt(ctx->data_commh, opt);
+    InitUdpReceiver(ctx->data_commh, constants::kClientListenPort, HandleClientCommand);
 
     Logger(INFO, "UDP IMU/control de sesion escuchando en puerto %u", constants::kClientListenPort);
 

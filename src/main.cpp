@@ -6,7 +6,6 @@
 #include "file_parser.h"
 #include "parser.h"
 
-#define ETHCOMMS_IMP
 #include "eth_comms.h"
 
 #define LOGGER_IMP
@@ -14,6 +13,7 @@
 
 #include "app_config.h"
 #include "client_transport.h"
+#include "comms_runtime.h"
 #include "orange_cube_controller.h"
 #include "realsense_capture.h"
 #include "video_streamer.h"
@@ -24,12 +24,17 @@ int main(int argc, char **argv) {
     CommsLogSetVerbosity(COMMS_WARN);
 
     rsapp::AppContext app;
-    commh_t data_commh = {};
-    commh_t control_commh = {};
-    app.data_commh = &data_commh;
-    app.control_commh = &control_commh;
+    app.data_commh = rsapp::CreateCommsHandle();
+    app.control_commh = rsapp::CreateCommsHandle();
+    if (app.data_commh == nullptr || app.control_commh == nullptr) {
+        rsapp::DestroyCommsHandle(app.data_commh);
+        rsapp::DestroyCommsHandle(app.control_commh);
+        return -1;
+    }
 
     if (!rsapp::LoadAppConfig(argc, argv, &app.config)) {
+        rsapp::DestroyCommsHandle(app.data_commh);
+        rsapp::DestroyCommsHandle(app.control_commh);
         return -1;
     }
 
@@ -44,5 +49,8 @@ int main(int argc, char **argv) {
     realsense_thread.join();
     imu_thread.join();
     control_thread.join();
+
+    rsapp::DestroyCommsHandle(app.data_commh);
+    rsapp::DestroyCommsHandle(app.control_commh);
     return 0;
 }
