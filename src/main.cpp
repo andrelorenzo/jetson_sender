@@ -24,6 +24,11 @@ int main(int argc, char **argv) {
     CommsLogSetVerbosity(COMMS_WARN);
 
     rsapp::AppContext app;
+    commh_t data_commh = {};
+    commh_t control_commh = {};
+    app.data_commh = &data_commh;
+    app.control_commh = &control_commh;
+
     if (!rsapp::LoadAppConfig(argc, argv, &app.config)) {
         return -1;
     }

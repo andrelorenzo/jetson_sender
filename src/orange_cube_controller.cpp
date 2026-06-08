@@ -267,10 +267,15 @@ void RunOrangeCubeControl(AppContext *ctx) {
 
     g_ctx = ctx;
 
+    if (ctx->control_commh == nullptr) {
+        Logger(ERROR, "Handle UDP de control no inicializado");
+        return;
+    }
+
     comms_opt_t opt = {};
     opt.local_port = constants::kControlListenPort;
     opt.recvcb = HandleControlCommand;
-    comms_udp_init__opt(&ctx->control_commh, opt);
+    comms_udp_init__opt(ctx->control_commh, opt);
 
     Logger(INFO, "Control UDP escuchando TWIST en puerto %u", constants::kControlListenPort);
 

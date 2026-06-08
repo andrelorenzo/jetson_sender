@@ -61,8 +61,8 @@ struct VideoStampInfo {
 struct AppContext {
     AppConfig config;
 
-    commh_t data_commh = {};
-    commh_t control_commh = {};
+    commh_t *data_commh = nullptr;
+    commh_t *control_commh = nullptr;
 
     std::atomic<bool> client_connected{false};
     std::atomic<bool> camera_connected{false};

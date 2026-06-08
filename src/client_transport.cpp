@@ -30,7 +30,9 @@ void HandleClientCommand(uint8_t *msg, size_t len, const char *ip, uint16_t port
     switch (payload.msg_id) {
         case constants::kMsgIdEstablishConnection:
             Logger(INFO, "Cliente conectado: %s:%u", ip, port);
-            CommsConnect(&g_ctx->data_commh, ip, port);
+            if (g_ctx->data_commh != nullptr) {
+                CommsConnect(g_ctx->data_commh, ip, port);
+            }
             ClearImuQueues(g_ctx);
             g_ctx->client_connected.store(true);
             break;
@@ -53,7 +55,7 @@ int32_t ScaleImu(float value) {
 } // namespace
 
 bool SendPayload(AppContext *ctx, uint16_t msg_id, const void *data, size_t data_size) {
-    if (ctx == nullptr || data == nullptr || data_size == 0) {
+    if (ctx == nullptr || ctx->data_commh == nullptr || data == nullptr || data_size == 0) {
         return false;
     }
 
@@ -77,7 +79,7 @@ bool SendPayload(AppContext *ctx, uint16_t msg_id, const void *data, size_t data
     }
 
     comms_send_opt_t opt = {};
-    return comms_send__opt(&ctx->data_commh, frame, static_cast<size_t>(frame_len), opt);
+    return comms_send__opt(ctx->data_commh, frame, static_cast<size_t>(frame_len), opt);
 }
 
 void ClearImuQueues(AppContext *ctx) {
@@ -140,7 +142,12 @@ void RunImuPublisher(AppContext *ctx) {
     comms_opt_t opt = {};
     opt.local_port = constants::kClientListenPort;
     opt.recvcb = HandleClientCommand;
-    comms_udp_init__opt(&ctx->data_commh, opt);
+    if (ctx->data_commh == nullptr) {
+        Logger(ERROR, "Handle UDP de datos no inicializado");
+        return;
+    }
+
+    comms_udp_init__opt(ctx->data_commh, opt);
 
     Logger(INFO, "UDP IMU/control de sesion escuchando en puerto %u", constants::kClientListenPort);
 
