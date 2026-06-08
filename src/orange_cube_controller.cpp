@@ -246,6 +246,19 @@ void HandleControlCommand(uint8_t *msg, size_t len, const char *ip, uint16_t por
     TwistCmd cmd = {};
     std::memcpy(&cmd, payload.data, sizeof(cmd));
 
+    Logger(
+        INFO,
+        "TWIST recibido seq=%u ts_us=%llu lin=[%.3f %.3f %.3f] ang=[%.3f %.3f %.3f]",
+        cmd.seq,
+        static_cast<unsigned long long>(cmd.ts_us),
+        cmd.lin[0],
+        cmd.lin[1],
+        cmd.lin[2],
+        cmd.ang[0],
+        cmd.ang[1],
+        cmd.ang[2]
+    );
+
     {
         std::lock_guard<std::mutex> lock(g_ctx->twist_mutex);
         g_ctx->latest_twist = cmd;
