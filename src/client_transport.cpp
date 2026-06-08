@@ -30,7 +30,7 @@ void HandleClientCommand(uint8_t *msg, size_t len, const char *ip, uint16_t port
 
     switch (payload.msg_id) {
         case constants::kMsgIdEstablishConnection:
-            Logger(INFO, "Cliente conectado: %s:%u", ip, port);
+            Logger(INFO, "Recibido MSGID_ESTABLISH_CONNECTION desde %s:%u", ip, port);
             if (g_ctx->data_commh != nullptr) {
                 CommsConnect(g_ctx->data_commh, ip, port);
             }
@@ -39,7 +39,7 @@ void HandleClientCommand(uint8_t *msg, size_t len, const char *ip, uint16_t port
             break;
 
         case constants::kMsgIdCloseConnection:
-            Logger(INFO, "Cliente desconectado");
+            Logger(INFO, "Recibido MSGID_UNSESTABLISH_CONNECTION desde %s:%u", ip, port);
             g_ctx->client_connected.store(false);
             ClearImuQueues(g_ctx);
             break;
