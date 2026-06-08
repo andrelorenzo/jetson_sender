@@ -24,6 +24,7 @@ add_executable(
     src/orange_cube_controller.cpp
 )
 target_include_directories(rs_sender PRIVATE ${GST_INCLUDE_DIRS} ${CMAKE_SOURCE_DIR}/include)
+target_include_directories(rs_sender PRIVATE ${CMAKE_SOURCE_DIR}/third_party/mavlink)
 target_compile_options(rs_sender PRIVATE ${GST_CFLAGS_OTHER})
 target_link_libraries(rs_sender PRIVATE ${GST_LIBRARIES} realsense2 Threads::Threads)
 
