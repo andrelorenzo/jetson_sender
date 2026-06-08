@@ -15,16 +15,20 @@ namespace {
 AppContext *g_ctx = nullptr;
 
 void HandleClientCommand(uint8_t *msg, size_t len, const char *ip, uint16_t port, uint16_t cid) {
-    if (g_ctx == nullptr || len == 0 || cid != 0) {
+    if (g_ctx == nullptr || len == 0) {
         return;
     }
+
+    Logger(DEBUG, "UDP recibido en puerto de sesion desde %s:%u len=%zu cid=%u", ip, port, len, cid);
 
     comms_payload_t payload = {};
     Crc32 crc;
     if (DecodeFrame(msg, static_cast<int>(len), &payload) < 0) {
+        Logger(WARN, "UDP descartado: DecodeFrame fallo desde %s:%u len=%zu", ip, port, len);
         return;
     }
     if (!crc.Check(&payload)) {
+        Logger(WARN, "UDP descartado: CRC invalido msg_id=0x%04X desde %s:%u", payload.msg_id, ip, port);
         return;
     }
 
