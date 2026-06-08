@@ -1,0 +1,18 @@
+# RTSP fijo: rtsp://<jetson-ip>:8554/realsense
+# DEBUG=true  -> reproduce BAG_FILE
+# DEBUG=false -> intenta conectar una RealSense D435i y, si RECORD_BAG=true, graba BAG_FILE
+
+DEBUG=false
+BAG_FILE="../bags/realsense_session.bag"
+WIDTH=1280
+HEIGHT=720
+FPS=30
+RECORD_BAG=false
+CONTROL_ENABLED=true
+FCU_DEV="/dev/ttyACM0"
+FCU_BAUD=115200
+CTRL_TIMEOUT_MS=250
+MAV_TARGET_SYSTEM=1
+MAV_TARGET_COMPONENT=1
+CTRL_ROS_CONVENTION=true
+CONVENTION=true
