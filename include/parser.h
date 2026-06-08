@@ -375,7 +375,10 @@ bool flag_parse(flag_ctx_t * c, int argc, char ** argv){
             fprintf(stdout,"%s", flag);
         }
 
-        flag += 1; // remove the '-'
+        flag += 1; // remove the first '-'
+        while (*flag == '-') {
+            flag += 1; // also accept GNU-style long flags like "--file"
+        }
         bool ignore = false;
         if (*flag == '/') {
             ignore = true;

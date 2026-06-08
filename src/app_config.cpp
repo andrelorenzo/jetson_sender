@@ -1,7 +1,12 @@
 #include "app_config.h"
 
+#include <limits.h>
+#include <unistd.h>
+
 #include <cstdio>
 #include <cstring>
+#include <string>
+#include <vector>
 
 #include "app_constants.h"
 #include "file_parser.h"
@@ -24,6 +29,106 @@ const char *BoolText(bool value) {
     return value ? "true" : "false";
 }
 
+bool IsAbsolutePath(const char *path) {
+    return path != nullptr && path[0] == '/';
+}
+
+std::string DirName(const std::string &path) {
+    const std::string::size_type slash = path.find_last_of('/');
+    if (slash == std::string::npos) {
+        return ".";
+    }
+    if (slash == 0) {
+        return "/";
+    }
+    return path.substr(0, slash);
+}
+
+std::string JoinPath(const std::string &base, const std::string &path) {
+    if (base.empty() || path.empty()) {
+        return path;
+    }
+    if (base.back() == '/') {
+        return base + path;
+    }
+    return base + "/" + path;
+}
+
+std::string CanonicalizeIfExists(const std::string &path) {
+    char resolved[PATH_MAX] = {};
+    if (realpath(path.c_str(), resolved) != nullptr) {
+        return resolved;
+    }
+    return path;
+}
+
+bool PathExists(const std::string &path) {
+    return access(path.c_str(), F_OK) == 0;
+}
+
+std::string GetCurrentDir() {
+    char cwd[PATH_MAX] = {};
+    if (getcwd(cwd, sizeof(cwd)) != nullptr) {
+        return cwd;
+    }
+    return ".";
+}
+
+std::string GetExecutableDir() {
+    char exe_path[PATH_MAX] = {};
+    const ssize_t len = readlink("/proc/self/exe", exe_path, sizeof(exe_path) - 1);
+    if (len <= 0) {
+        return GetCurrentDir();
+    }
+
+    exe_path[len] = '\0';
+    return DirName(exe_path);
+}
+
+bool ResolveConfigPath(const char *requested, std::string *resolved_path) {
+    if (requested == nullptr || requested[0] == '\0' || resolved_path == nullptr) {
+        return false;
+    }
+
+    const std::string requested_path(requested);
+    std::vector<std::string> candidates;
+
+    if (IsAbsolutePath(requested)) {
+        candidates.push_back(requested_path);
+    } else {
+        const std::string exe_dir = GetExecutableDir();
+        const std::string repo_dir = DirName(exe_dir);
+
+        candidates.push_back(requested_path);
+        candidates.push_back(JoinPath(exe_dir, requested_path));
+        if (repo_dir != exe_dir) {
+            candidates.push_back(JoinPath(repo_dir, requested_path));
+        }
+    }
+
+    for (size_t i = 0; i < candidates.size(); ++i) {
+        if (PathExists(candidates[i])) {
+            *resolved_path = CanonicalizeIfExists(candidates[i]);
+            return true;
+        }
+    }
+
+    Logger(ERROR, "No se encontro el archivo de configuracion solicitado: %s", requested);
+    for (size_t i = 0; i < candidates.size(); ++i) {
+        Logger(ERROR, "  ruta probada[%zu]: %s", i, candidates[i].c_str());
+    }
+    return false;
+}
+
+void ResolveRelativePathInPlace(char *buffer, size_t size, const std::string &base_dir) {
+    if (buffer == nullptr || size == 0 || buffer[0] == '\0' || IsAbsolutePath(buffer)) {
+        return;
+    }
+
+    const std::string resolved = JoinPath(base_dir, buffer);
+    std::snprintf(buffer, size, "%s", resolved.c_str());
+}
+
 } // namespace
 
 bool LoadAppConfig(int argc, char **argv, AppConfig *config) {
@@ -34,6 +139,11 @@ bool LoadAppConfig(int argc, char **argv, AppConfig *config) {
     char **filename = FlagStr("file", false, "params/config.txt", "Path to the config file");
     if (!FlagParse(argc, argv)) {
         FlagPrintHelp(stdout);
+        return false;
+    }
+
+    std::string config_path;
+    if (!ResolveConfigPath(*filename, &config_path)) {
         return false;
     }
 
@@ -53,10 +163,14 @@ bool LoadAppConfig(int argc, char **argv, AppConfig *config) {
     ParamUint(&config->mav_target_component, "MAV_TARGET_COMPONENT", false, 1, "OrangeCube MAVLink target component id");
     ParamBool(&config->ctrl_ros_convention, "CTRL_ROS_CONVENTION", false, true, "Interpret incoming twist with ROS body convention");
 
-    if (!ParamParse(*filename, FILE_TYPE_TXT)) {
+    if (!ParamParse(config_path.c_str(), FILE_TYPE_TXT)) {
+        Logger(ERROR, "No se pudo parsear el archivo de configuracion: %s", config_path.c_str());
         ParamPrintError(stdout);
         return false;
     }
+
+    ResolveRelativePathInPlace(config->bag_file, sizeof(config->bag_file), DirName(config_path));
+    Logger(INFO, "Config cargada desde: %s", config_path.c_str());
 
     if (config->debug && config->record_bag) {
         Logger(WARN, "RECORD_BAG se ignora cuando DEBUG=true");
