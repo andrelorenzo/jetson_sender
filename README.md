@@ -67,6 +67,15 @@ El binario resultante será:
 build/rs_sender
 ```
 
+Ejemplos de arranque manual:
+
+```bash
+./build/rs_sender -file params/config.txt
+cd build && ./rs_sender -file ../params/config.txt
+```
+
+La aplicacion acepta `-file` y tambien `--file`.
+
 ## Servicio systemd
 
 El script genera y habilita automáticamente un servicio `systemd` para arrancar al encender la Jetson.
