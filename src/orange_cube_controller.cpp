@@ -7,6 +7,7 @@
 #include <cerrno>
 #include <chrono>
 #include <cmath>
+#include <cstdio>
 #include <cstring>
 #include <thread>
 
@@ -20,6 +21,44 @@ namespace rsapp {
 namespace {
 
 AppContext *g_ctx = nullptr;
+
+const char *SafeIp(const char *ip) {
+    return ip != nullptr ? ip : "<unknown>";
+}
+
+const char *HexPreview(const uint8_t *data, size_t len, char *buffer, size_t buffer_size) {
+    if (buffer == nullptr || buffer_size == 0) {
+        return "";
+    }
+    buffer[0] = '\0';
+
+    if (data == nullptr || len == 0) {
+        std::snprintf(buffer, buffer_size, "<empty>");
+        return buffer;
+    }
+
+    size_t offset = 0;
+    const size_t preview_len = len < 24 ? len : 24;
+    for (size_t i = 0; i < preview_len && offset + 4 < buffer_size; ++i) {
+        const int written = std::snprintf(
+            buffer + offset,
+            buffer_size - offset,
+            "%02X%s",
+            static_cast<unsigned int>(data[i]),
+            (i + 1 < preview_len) ? " " : ""
+        );
+        if (written <= 0) {
+            break;
+        }
+        offset += static_cast<size_t>(written);
+    }
+
+    if (preview_len < len && offset + 8 < buffer_size) {
+        std::snprintf(buffer + offset, buffer_size - offset, " ...");
+    }
+
+    return buffer;
+}
 
 float Clamp(float value, float min_value, float max_value) {
     if (value < min_value) {
@@ -218,33 +257,100 @@ void CloseSerial() {
 }
 
 void HandleControlCommand(uint8_t *msg, size_t len, const char *ip, uint16_t port, uint16_t cid) {
-    (void)ip;
-    (void)port;
-
     if (g_ctx == nullptr || len == 0 || cid != 0) {
+        if (len > 0) {
+            Logger(
+                WARN,
+                "UDP control descartado antes de parseo: ctx=%p len=%zu cid=%u desde %s:%u",
+                static_cast<void *>(g_ctx),
+                len,
+                cid,
+                SafeIp(ip),
+                port
+            );
+        }
         return;
     }
+
+    char raw_preview[128] = {};
+    Logger(
+        INFO,
+        "UDP control recibido desde %s:%u len=%zu cid=%u raw=%s",
+        SafeIp(ip),
+        port,
+        len,
+        cid,
+        HexPreview(msg, len, raw_preview, sizeof(raw_preview))
+    );
 
     comms_payload_t payload = {};
     Crc32 crc;
-    if (DecodeFrame(msg, static_cast<int>(len), &payload) < 0) {
+    const int decoded_len = DecodeFrame(msg, static_cast<int>(len), &payload);
+    if (decoded_len < 0) {
+        Logger(
+            WARN,
+            "UDP control descartado: DecodeFrame fallo desde %s:%u len=%zu raw=%s",
+            SafeIp(ip),
+            port,
+            len,
+            HexPreview(msg, len, raw_preview, sizeof(raw_preview))
+        );
         return;
     }
-    if (!crc.Check(&payload)) {
+
+    const uint32_t computed_crc = crc.Calculate(&payload);
+    if (payload.crc_32 != computed_crc) {
+        char payload_preview[128] = {};
+        Logger(
+            WARN,
+            "UDP control descartado: CRC invalido desde %s:%u decoded_len=%d msg_id=0x%04X data_size=%u crc_rx=0x%08X crc_calc=0x%08X payload=%s",
+            SafeIp(ip),
+            port,
+            decoded_len,
+            payload.msg_id,
+            payload.data_size,
+            payload.crc_32,
+            computed_crc,
+            HexPreview(payload.data, payload.data_size, payload_preview, sizeof(payload_preview))
+        );
         return;
     }
 
     if (payload.msg_id != constants::kMsgIdTwistCmd) {
+        Logger(
+            WARN,
+            "UDP control descartado: msg_id inesperado 0x%04X desde %s:%u, esperado 0x%04X",
+            payload.msg_id,
+            SafeIp(ip),
+            port,
+            constants::kMsgIdTwistCmd
+        );
         return;
     }
 
     if (payload.data_size < sizeof(TwistCmd)) {
-        Logger(WARN, "TWIST cmd size incorrecto: %u", payload.data_size);
+        Logger(
+            WARN,
+            "TWIST cmd size incorrecto desde %s:%u: recibido=%u esperado=%zu",
+            SafeIp(ip),
+            port,
+            payload.data_size,
+            sizeof(TwistCmd)
+        );
         return;
     }
 
     TwistCmd cmd = {};
     std::memcpy(&cmd, payload.data, sizeof(cmd));
+
+    Logger(
+        INFO,
+        "UDP control parseado: msg_id=0x%04X data_size=%u struct_size=%zu seq=%u",
+        payload.msg_id,
+        payload.data_size,
+        sizeof(TwistCmd),
+        cmd.seq
+    );
 
     Logger(
         INFO,
